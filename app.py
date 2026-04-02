@@ -123,16 +123,16 @@ if st.session_state.data_loaded:
         st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
-    st.subheader("💬 Deep-Dive Q&A")
+    st.subheader("💬 Deep-Dive Q&A about comments")
     
     col1, col2, col3 = st.columns([1,1,1])
     preset_query = None
     with col1:
-        if st.button("💰 Price"): preset_query = "List price/value comments. Format ID_X: Comment"
+        if st.button("💰 Price related"): preset_query = "List price/value comments. Format ID_X: Comment"
     with col2:
-        if st.button("😊 Positive"): preset_query = "List positive comments. Format ID_X: Comment"
+        if st.button("😊 Positive comments"): preset_query = "List positive comments. Format ID_X: Comment"
     with col3:
-        if st.button("😡 Hate"): preset_query = "List hate comments. Format ID_X: Comment"
+        if st.button("😡 Hate comments"): preset_query = "List hate comments. Format ID_X: Comment"
 
     custom_q = st.text_input("Ask a question:", placeholder="e.g. Most common complaint?")
     final_query = custom_q if custom_q else preset_query
