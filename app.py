@@ -8,7 +8,6 @@ import plotly.express as px
 from dotenv import load_dotenv
 
 # --- 1. SETUP & CONFIGURATION ---
-# Handling Secrets for both Local and Streamlit Cloud
 if "OPENROUTER_API_KEY" in st.secrets:
     api_key = st.secrets["OPENROUTER_API_KEY"]
 else:
@@ -21,7 +20,6 @@ st.set_page_config(page_title="AI Social Intelligence", layout="wide")
 st.title("🎯 YouTube Audience Intelligence Hub")
 
 # --- 2. CACHED SCRAPING FUNCTION ---
-# This prevents re-scraping the same URL multiple times, saving time and credits
 @st.cache_data(show_spinner=False)
 def scrape_youtube_comments(url):
     try:
@@ -64,8 +62,6 @@ if 'chart_data' not in st.session_state: st.session_state.chart_data = None
 # --- STEP 1: INPUT & SCRAPE ---
 st.header("Video Comments")
 url = st.text_input("Paste YouTube Video URL:", placeholder="https://www.youtube.com/watch?v=...")
-
-# Added Example URL for new users
 st.caption("💡 **Example URL:** `https://www.youtube.com/watch?v=dQw4w9WgXcQ` (Paste this to test!)")
 
 if st.button("🚀 Start Scraping"):
@@ -75,7 +71,7 @@ if st.button("🚀 Start Scraping"):
             if isinstance(result, list) and len(result) > 0:
                 st.session_state.comments = result
                 st.session_state.csv_ready = True
-                st.session_state.chart_data = None # Reset for new video
+                st.session_state.chart_data = None 
                 st.success(f"✅ Found {len(result)} comments!")
             elif "Error" in str(result):
                 st.error(result)
@@ -89,38 +85,58 @@ if st.session_state.csv_ready and not st.session_state.data_loaded:
         st.session_state.data_loaded = True
         st.rerun()
 
-# --- STEP 3: VISUALIZATION & Q&A ---
+# --- STEP 3: ANALYZE & CHART ---
 if st.session_state.data_loaded:
     st.divider()
     
     if st.session_state.chart_data is None:
         with st.spinner("Generating Chart..."):
+            # FIXED: Removed 'genai.GenerativeModel' and used 'query_openrouter' instead
             chart_prompt = (
-                f"Analyze these: {st.session_state.comments[:50]}. "
-                "Return ONLY JSON: {'positive_score': number, 'negative_score': number}."
+                f"Analyze these comments: {st.session_state.comments[:50]}. "
+                "Return ONLY a JSON object: {'positive_score': number, 'negative_score': number}. "
+                "The numbers must be whole integers that add up to 100."
             )
             raw_response = query_openrouter(chart_prompt, is_json=True)
+            
             if raw_response:
                 try:
-                    st.session_state.chart_data = json.loads(raw_response.strip().replace('```json', '').replace('```', ''))
-                except:
-                    st.error("AI formatting error. Please try again.")
+                    # Clean response and load JSON
+                    clean_json = raw_response.strip().replace('```json', '').replace('```', '')
+                    st.session_state.chart_data = json.loads(clean_json)
+                except Exception:
+                    st.error("AI was unable to format the chart data properly.")
 
+    # Display Chart
     if st.session_state.chart_data:
         st.header("Audience Sentiment Pulse")
         s_data = st.session_state.chart_data
+        pos = s_data.get('positive_score', 0)
+        neg = s_data.get('negative_score', 0)
         
-        # Responsive Pie Chart
         pie_df = pd.DataFrame({
             "Sentiment": ["Positive ✅", "Negative ❌"],
-            "Percentage": [s_data.get('positive_score', 0), s_data.get('negative_score', 0)]
+            "AI_Score": [pos, neg]
         })
         
-        fig = px.pie(pie_df, values='Percentage', names='Sentiment', hole=0.5,
-                     color='Sentiment', color_discrete_map={'Positive ✅': '#2ecc71', 'Negative ❌': '#e74c3c'})
+        fig = px.pie(
+            pie_df, 
+            values='AI_Score', 
+            names='Sentiment', 
+            hole=0.5,
+            color='Sentiment', 
+            color_discrete_map={'Positive ✅': '#2ecc71', 'Negative ❌': '#e74c3c'},
+            hover_data=['AI_Score'],
+            labels={'AI_Score': 'Percentage'}
+        )
+
+        fig.update_traces(
+            textinfo='percent+label', 
+            hovertemplate="%{label}: %{value}%<extra></extra>"
+        )
         
-        # use_container_width ensures it looks good on mobile
         st.plotly_chart(fig, use_container_width=True)
+        st.caption(f"Analysis shows {pos}% Positive and {neg}% Negative feedback.")
 
     st.divider()
     st.subheader("💬 Deep-Dive Q&A about comments")
